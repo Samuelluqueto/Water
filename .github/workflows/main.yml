@@ -61,9 +61,11 @@ jobs:
 
       - name: Sincronizar arquivos Web
         run: |
-          if [ -f "$PROJECT_DIR/scripts/sync-web.sh" ]; then
-            chmod +x "$PROJECT_DIR/scripts/sync-web.sh"
-            "$PROJECT_DIR/scripts/sync-web.sh"
+          cd "$PROJECT_DIR"
+
+          if [ -f "scripts/sync-web.sh" ]; then
+            chmod +x scripts/sync-web.sh
+            ./scripts/sync-web.sh
           else
             echo "sync-web.sh não encontrado."
             echo "Continuando..."
@@ -87,11 +89,10 @@ jobs:
             exit 1
           fi
 
-          echo "APK encontrado:"
-          echo "$APK"
-
           mkdir -p apk-final
           cp "$APK" apk-final/Water.apk
+
+          echo "APK encontrado e preparado!"
 
       - name: Disponibilizar APK
         uses: actions/upload-artifact@v4
