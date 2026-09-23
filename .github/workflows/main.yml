@@ -1,0 +1,101 @@
+name: Gerar APK Water
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Baixar projeto
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Encontrar e extrair ZIP
+        run: |
+          echo "=== ARQUIVOS DO REPOSITÓRIO ==="
+          find . -maxdepth 3 -type f | sort
+
+          ZIP_FILE=$(find . -maxdepth 2 -type f -name "*.zip" | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERRO: Nenhum arquivo ZIP encontrado."
+            exit 1
+          fi
+
+          echo "ZIP encontrado: $ZIP_FILE"
+
+          mkdir -p projeto
+          unzip -o "$ZIP_FILE" -d projeto
+
+          echo ""
+          echo "=== PROJETO EXTRAÍDO ==="
+          find projeto -maxdepth 5 -type f | sort
+
+      - name: Localizar projeto Gradle
+        run: |
+          SETTINGS=$(find projeto -name "settings.gradle" -o -name "settings.gradle.kts" | head -n 1)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "ERRO: settings.gradle não encontrado."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+
+          echo "Projeto encontrado em:"
+          echo "$PROJECT_DIR"
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+
+      - name: Instalar Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Sincronizar arquivos Web
+        run: |
+          if [ -f "$PROJECT_DIR/scripts/sync-web.sh" ]; then
+            chmod +x "$PROJECT_DIR/scripts/sync-web.sh"
+            "$PROJECT_DIR/scripts/sync-web.sh"
+          else
+            echo "sync-web.sh não encontrado."
+            echo "Continuando..."
+          fi
+
+      - name: Gerar APK
+        run: |
+          cd "$PROJECT_DIR"
+          gradle assembleDebug --stacktrace
+
+      - name: Procurar APK
+        run: |
+          echo "=== PROCURANDO APK ==="
+
+          find "$PROJECT_DIR" -name "*.apk" -type f -print
+
+          APK=$(find "$PROJECT_DIR" -name "app-debug.apk" -type f | head -n 1)
+
+          if [ -z "$APK" ]; then
+            echo "ERRO: APK não encontrado."
+            exit 1
+          fi
+
+          echo "APK encontrado:"
+          echo "$APK"
+
+          mkdir -p apk-final
+          cp "$APK" apk-final/Water.apk
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Water-APK
+          path: apk-final/Water.apk
+          if-no-files-found: error
